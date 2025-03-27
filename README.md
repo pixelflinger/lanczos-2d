@@ -29,8 +29,8 @@ Physically Based Renderer (PBR) targeting mobile platforms,
 implementations of temporal anti-aliasing (TAA) and upscaling.
 
 > [!NOTE]
-> [A Survey of Temporal Antialiasing Techniques](http://behindthepixels.io/assets/files/TemporalAA.pdf) is an excelent starting point
-> if you're not familiar with temporal antialiasing and upscaling.
+> [A Survey of Temporal Antialiasing Techniques](http://behindthepixels.io/assets/files/TemporalAA.pdf)
+> is an excellent starting point if you're not familiar with temporal antialiasing and upscaling.
 
 ### Temporal Anti-aliasing
 
@@ -43,7 +43,7 @@ in an overly blurred image and exhibits anisotropic artifacts.
 [2D CatMull-Rom](https://gist.github.com/TheRealMJP/c83b8c0f46b63f3a88a5986f4fa982b1) 
 filter for sampling
 the history buffer and a Blackman-Harris approximation for the input. These
-filters were chosen without putting too much thought into it; CatMull-Rom is
+filters were chosen without putting too much thought into it. CatMull-Rom is
 a high quality and very efficient filter, while Blackman-Harris was suggested in
 the “[High Quality Temporal Supersampling](https://advances.realtimerendering.com/s2014/#_HIGH-QUALITY_TEMPORAL_SUPERSAMPLING)” Siggraph 2014 presentation by
 Brian Karis – so that was the end of it.
@@ -52,13 +52,13 @@ Brian Karis – so that was the end of it.
 
 For temporal upscaling however, a filter that preserves more details is preferable.
 Looking around the internet a bit, the [Lanczos](https://en.wikipedia.org/wiki/Lanczos_resampling) filter seemed to be a 
-popular choice – it’s used by both [FSR](https://www.amd.com/en/products/graphics/technologies/fidelityfx/super-resolution.html) and [SGSR](https://www.qualcomm.com/news/onq/2023/04/introducing-snapdragon-game-super-resolution), so it seemed
-natural to use it for sampling the input buffer. 
+popular choice – it’s used by both [FSR](https://www.amd.com/en/products/graphics/technologies/fidelityfx/super-resolution.html)
+and [SGSR](https://www.qualcomm.com/news/onq/2023/04/introducing-snapdragon-game-super-resolution),
+so it seemed natural to use it for sampling the input buffer. 
 
 ### Lanczos
 
-Lanczos is a sinc-windowed
-ideal reconstruction filter:
+Lanczos is a sinc-windowed ideal reconstruction filter:
 
 ```math
 L_a(x) = \left\{ \begin{array}{cl} sinc(x)sinc(x/a) & if \ |x| \lt a \\ 0 & otherwise \end{array} \right.
@@ -68,9 +68,8 @@ L_a(x) = \left\{ \begin{array}{cl} sinc(x)sinc(x/a) & if \ |x| \lt a \\ 0 & othe
 
 Lanczos as defined above is a 1D filter, but obviously here we need a 2D 
 application of it. That's where things start to become weird. There is 
-something peculiar in the various usages of Lanczos as a 2D filter;
-Sometimes it is used as a radial basis function (RBF), and at other 
-times it is used as a separable filter:
+something peculiar in the various usages of Lanczos as a 2D filter: sometimes it is used as a radial
+basis function (RBF), and at other times it is used as a separable filter:
 
 $$\begin{array}{cl}
 L_2(x, y) & = L_2(\rho), & with\ \rho=\sqrt{x^2+y^2}\\
@@ -80,12 +79,13 @@ For example, FSR2 uses the separable application for sampling the history
 buffer, but the RBF version for sampling the input buffer. Looking 
 around the internet, the overwhelming explanation given is that Lanczos is not
 separable, but for performance reasons it is often approximated by the 
-separable version. This is for example the explanation given [here](https://github.com/jeffboody/Lanczos) – but 
-there are many other sources that make the same claim. 
+separable version. This is for example the explanation given
+[here](https://github.com/jeffboody/Lanczos), but there are many other sources
+that make the same claim. 
 
-Oddly, the Lanczos [wikipedia](https://en.wikipedia.org/wiki/Lanczos_resampling) page unambiguously states that
-$L_a(x, y) = L_a(x)L_a(y)$ without any justification – which seems at odds with
-other popular parts of the internet.
+Oddly, the Lanczos [Wikipedia](https://en.wikipedia.org/wiki/Lanczos_resampling) page
+unambiguously states that $L_a(x, y) = L_a(x)L_a(y)$ without any justification, which
+seems at odds with other popular sources.
 
 The claim that $L_a(x, y)$ is defined as $L_a(\sqrt{x^2+y^2})$ and can be 
 approximated by $L_a(x)L_a(y)$ is suspicious because no rigorous 
@@ -95,18 +95,18 @@ mathematical justification can be found **anywhere**.
 
 I finally got around implementing Lanczos-2 into Filament using the RBF and 
 supposed "correct" definition $L_2(x,y) = L_2(\sqrt{x^2+y^2})$ for sampling 
-the TAA input. Surprisingly, it produced an overly sharpened image; sure,
-it looked sharp, but it also looked wrong. 
+the TAA input. Surprisingly, it produced an overly sharpened image. It looked
+sharp, but it also looked wrong. 
 
-Moreover, this sharpening happened even when centering the Lanczos kernel at
-exactly pixel centers – You'd expect the filter to be a no-op in that case,
-as it is in 1D.
+Moreover, this sharpening happened even when centering the Lanczos kernel
+exactly at pixel centers. We would expect the filter to be a no-op in that
+case, as it is in 1D.
 
 ![lanczos-2 no-op](art/lanczos_noop.svg)\
 _The 1D Lanczos filter is a no-op when centered on an input sample_
 
-Obviously when looking at it more closely, it is clear that it cannot be a
-no-op, since the corner samples are not located at the same distance as the 
+When looking at it more closely, it is clear that it cannot be a no-op,
+since the corner samples are not located at the same distance as the 
 “cross” samples, so they receive a negative weight:
 
 ![2D Lanczos weights](art/Lanczos2d.svg)\
@@ -114,8 +114,8 @@ _The "cross" samples all get a filter coefficient of exactly zero, while the
 "corner" samples get a negative coefficient. The middle sample's coefficient
 being exactly 1._
 
-Clearly, something is isn't right. And when that happens, the best solution is 
-to go back to first principles and stop trusting the internet.
+Clearly, something isn't right. And when that happens, the best solution is 
+to go back to first principles and stop trusting the Internet.
 
 ## 2D Signal Processing
 
@@ -124,8 +124,8 @@ to go back to first principles and stop trusting the internet.
 More precisely, what is an image _generated by the GPU_? 
 
 All the GPU does, really, is to **sample** triangles on a **regular grid**.
-These samples are ultimately stored into memory, which, in our case is backing
-a texture. The value of each sample is determined by running a fragment shader.
+These samples are ultimately stored into memory, which, in our case, is a texture.
+The value of each sample is determined by running a fragment shader.
 
 The key point to realize here is that the GPU has the same function as a 2D ADC 
 (Analog-Digital Converter), sampling analytic geometry (triangles) at specific
@@ -160,7 +160,7 @@ domain, the image's spectrum (top-right) is **convolved** by the comb's spectrum
 (middle-right) and results in a duplicated spectrum of the image (bottom-right)_
 
 > [!NOTE]
-> The images above are a simulation of sampling an analog image, in reality,
+> The images above are a simulation of sampling an analog image. In reality,
 > and as stated above, the spectrum of the image is replicated in all directions
 > forever (i.e: it's not limited to [-2,-2]).
 
@@ -209,14 +209,14 @@ with $jinc(\rho)=J_1(\pi \rho) / \pi  r$
 >
 > ![Radial Profile of sinc's FFT](art/fft_sinc_rbf.svg)
 
-Because the disk has a smaller area as the square, this ideal, isotropic,
+Because the disk has a smaller area than the square, this ideal, isotropic,
 reconstruction filter will blur a little bit more than the square filter.
 The disk reconstruction filter is ideal if the original signal is properly
 band-limited (i.e. doesn't have spectral content outside of that disk).
 
 > [!NOTE]
-> Above we described the **ideal reconstruction filter**, in practice it
-> cannot be implemented because it requires infinite support (i.e. infinite
+> We just described the **ideal reconstruction filter**. It cannot be
+> implemented in practice because it requires infinite support (i.e. infinite
 > length). Instead, we use a windowed version of the ideal filter,
 > such as Lanczos, or other low-pass filters.
 
@@ -229,19 +229,19 @@ band-limited in the first place:
 
 ![reconstruction](art/reconstruction.svg)\
 _Reconstruction of an improperly band-limited image, using a truncated 
-ideal sinc filter yields to anisotropic ringing artifacts_
+ideal sinc filter, yields to anisotropic ringing artifacts_
 
 ## Recap
 
 Just to recap, we’ve just shown that:
-- separable _sinc_ is the ideal 2D reconstruction filter
-- radial _jinc_ is the ideal isotropic reconstruction filter
-- radial _sinc_ is just completely wrong
+- Separable _sinc_ is the ideal 2D reconstruction filter.
+- Radial _jinc_ is the ideal isotropic reconstruction filter.
+- Radial _sinc_ is just completely wrong.
 
 ## Lanczos: take II
 
 Given that we found the radial _sinc_ filter is an incorrect reconstruction 
-filter, it's legitimate to ask: is the radial Lanczos filter also "incorrect"?
+filter, it's legitimate to ask whether the radial Lanczos filter is also "incorrect"?
 
 ![Radial Profile of Lanczos FFT](art/fft_lanczos_rbf.svg)\
 _Radial profiles of Lanczos-2 and -3 FFTs. High frequencies are heavily boosted._
@@ -254,8 +254,8 @@ artifacts effectively.
 
 ### Correct Radial Lanczos filter
 
-Just like with _sinc_ and _jinc_ there is a correct version of the radial 
-Lanczos filter, and unsurprisingly, it uses the _jinc_ function:
+Just like with _sinc_ and _jinc_, there is a correct version of the radial 
+Lanczos filter which, unsurprisingly, uses the _jinc_ function:
 
 ```math
 L_a(\rho) = \left\{ \begin{array}{cl} \pi jinc(\rho)jinc(\rho/a) & if \ |\rho| \lt a \\ 0 & otherwise \end{array} \right.
@@ -273,8 +273,8 @@ without using a lookup table.
 
 The separable application of the Lanczos filter is actually correct — albeit 
 not isotropic — and it is **not** an approximation of the radial application of
-1D Lanczos unlike what can be often read on the internet. In that regard the
-Lanczos wikipedia page is correct.
+1D Lanczos unlike what can be often read on the Internet. In that regard, the
+Lanczos Wikipedia page is correct.
 
 The correct radial and isotropic Lanczos application uses a modified Lanczos 
 equation which uses _jinc_ instead of _sinc_.
@@ -285,16 +285,16 @@ equation which uses _jinc_ instead of _sinc_.
 
 We've seen above that to be able to fully reconstruct the original 2D image
 from its samples, the sampling operation needed to honor the Nyquist-Shannon 
-Theorem. However, by default, rasterizing a triangle on the GPU does not. 
+theorem. However, by default, rasterizing a triangle on the GPU does not. 
 This often manifests with moiré patterns in areas of high frequencies.
 
 <img src="art/aliased_checker.png" style="width: 640px; image-rendering: pixelated;">\
 _Aliasing can be seen in the distance. Low frequencies appear where there
 should be none._
 
-Two ways that GPUs can help us mitigate this during rasterization, is by 
-using MSAA and mipmaping. MSAA addresses aliasing due to sampling the
-geometry, while mipmapping addresses aliasing due to sampling textures. 
+MSAA and mipmaping are Two ways that GPUs can use to help mitigate this during
+rasterization. MSAA addresses aliasing due to sampling the geometry,
+while mipmapping addresses aliasing due to sampling textures. 
 
 > [!NOTE]
 > Shading computations can also create high frequencies, for example with
@@ -304,8 +304,8 @@ MSAA and mipmapping effectively approximate sampling a band-limited image.
 
 > [!NOTE]
 > This explains why most spatial upscalers, such as FSR1 or SGSR1, work
-> better with a "well anti-aliased" source image — a properly
-> band-limited sampled image. Such an image can better be reconstructed 
+> better with a "well anti-aliased" source image, a properly
+> band-limited sampled image. Such an image can be better reconstructed 
 > according to Nyquist-Shannon. In essence, the sampled image has more
 > high-frequency information preserved (i.e.: it contains more of the 
 > original image). 
@@ -314,14 +314,14 @@ MSAA and mipmapping effectively approximate sampling a band-limited image.
 
 Mathematically, anti-aliasing corresponds to sampling the signal (here an image)
 at a higher rate and applying a low-pass filter to that (this is called
-super-sampling anti-aliasing, or SSAA). Let's break it down:
+super-sampling anti-aliasing, or SSAA).
 
 When we sample the image at a higher rate, we effectively push higher the
 frequencies destroyed by the overlap of the replicated spectra. In other words,
 the frequencies that would have been destroyed at the lower sampling rate are
 now intact (or at least not affected as much). Of course, our image is now of 
-higher resolution, so we need to **re-sample** it; but this time, we first 
-apply a digital low-pass filter, guaranteeing the Nyquist-Shannon prerequisite.
+higher resolution, so we need to **resample** it. This time however, we first 
+apply a digital low-pass filter, satisfying the Nyquist-Shannon prerequisite.
 
 <img src="art/antialiased_checker.png" style="width: 640px; image-rendering: pixelated;">\
 _16x Anti-aliasing using the separable Lanczos-3 low-pass filter. The moiré
@@ -336,8 +336,8 @@ _Examples of various filters frequency response profiles. We use the radial
 version of filters for illustration._
 
 In many TAA implementations, the input samples are said to be "de-jittered" 
-before accumulation — that's one way to think about it, but it hides a more
-profound meaning; in reality we're applying a low-pass, band-limiting, filter
-prior to re-sampling. This is the mathematical justification for SGSR and FSR's
+before accumulation. That's one way to think about it, but it hides a more
+profound meaning: in reality we're applying a low-pass, band-limiting, filter
+prior to resampling. This is the mathematical justification for SGSR and FSR's
 (incorrect, keep reading) Lanczos-2, or Unreal's (correct) Blackman-Harris 
 filters.
