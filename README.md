@@ -68,8 +68,9 @@ L_a(x) = \left\{ \begin{array}{cl} sinc(x)sinc(x/a) & if \ |x| \lt a \\ 0 & othe
 
 Lanczos as defined above is a 1D filter, but obviously here we need a 2D 
 application of it. That's where things start to become weird. There is 
-something peculiar in the various usages of Lanczos as a 2D filter: sometimes it is used as a radial
-basis function (RBF), and at other times it is used as a separable filter:
+something peculiar in the various usages of Lanczos as a 2D filter: sometimes it
+is used as a radial basis function (RBF), and at other times it is used as a 
+separable filter:
 
 $$\begin{array}{cl}
 L_2(x, y) & = L_2(\rho), & with\ \rho=\sqrt{x^2+y^2}\\
@@ -162,14 +163,14 @@ domain, the image's spectrum (top-right) is **convolved** by the comb's spectrum
 > [!NOTE]
 > The images above are a simulation of sampling an analog image. In reality,
 > and as stated above, the spectrum of the image is replicated in all directions
-> forever (i.e: it's not limited to [-2,-2]).
+> forever (i.e: it's not limited to $[-2,2]$).
 
 The key idea to visualize here is that the spectrum is replicated on a 
 **regular grid**.
 
 ### 2D image reconstruction
 
-If we assume that Nyquist-Shannon is honored, we can reconstruct the original 
+If we assume that Nyquist-Shannon is satisfied, we can reconstruct the original 
 2D image without any loss just from its samples. This is done by removing the 
 copies of the spectrum created by the sampling operation. Since the copies 
 are placed on a regular grid, the _ideal reconstruction filter_ has
@@ -193,7 +194,9 @@ This corresponds to a **convolution** by the isotropic, RBF
 
 $$\frac{\pi}{2} jinc\left(\sqrt{x^2+y^2}\right)$$
 
-with $jinc(\rho)=J_1(\pi \rho) / \pi  r$
+with $jinc(\rho)=J_1(\pi \rho) / \pi \rho$\
+and $J_1$ a [Bessel Function of the First Kind](https://en.wikipedia.org/wiki/Bessel_function#Spherical_Bessel_functions): 
+$J_1(x) = \frac{1}{\pi}\int_0^\pi{cos(n\tau-x sin \tau)d\tau}$
 
 ![jinc(x, y)](art/jinc.png)
 
@@ -224,7 +227,7 @@ band-limited (i.e. doesn't have spectral content outside of that disk).
 
 It's not actually possible to reconstruct our original "square" image using
 an _ideal reconstruction filter_ because that filter cannot be implemented
-(here we have truncated version of it), and our original image wasn't 
+(here we have a truncated version of it), and our original image wasn't
 band-limited in the first place:
 
 ![reconstruction](art/reconstruction.svg)\
@@ -234,13 +237,13 @@ ideal sinc filter, yields to anisotropic ringing artifacts_
 ## Recap
 
 Just to recap, we’ve just shown that:
-- Separable _sinc_ is the ideal 2D reconstruction filter.
-- Radial _jinc_ is the ideal isotropic reconstruction filter.
-- Radial _sinc_ is just completely wrong.
+- Separable $sinc(x, y)$ is the ideal 2D reconstruction filter.
+- Radial $jinc(\rho)$ is the ideal isotropic reconstruction filter.
+- Radial $sinc(\rho)$ is just completely wrong.
 
 ## Lanczos: take II
 
-Given that we found the radial _sinc_ filter is an incorrect reconstruction 
+Given that we found the radial $sinc$ filter is an incorrect reconstruction 
 filter, it's legitimate to ask whether the radial Lanczos filter is also "incorrect"?
 
 ![Radial Profile of Lanczos FFT](art/fft_lanczos_rbf.svg)\
@@ -254,8 +257,8 @@ artifacts effectively.
 
 ### Correct Radial Lanczos filter
 
-Just like with _sinc_ and _jinc_, there is a correct version of the radial 
-Lanczos filter which, unsurprisingly, uses the _jinc_ function:
+Just like with $sinc$ and $jinc$, there is a correct version of the radial 
+Lanczos filter which, unsurprisingly, uses the $jinc$ function:
 
 ```math
 L_a(\rho) = \left\{ \begin{array}{cl} \pi jinc(\rho)jinc(\rho/a) & if \ |\rho| \lt a \\ 0 & otherwise \end{array} \right.
@@ -263,7 +266,7 @@ L_a(\rho) = \left\{ \begin{array}{cl} \pi jinc(\rho)jinc(\rho/a) & if \ |\rho| \
 with $jinc(\rho)=J_1(\pi \rho) / \pi  r$
 
 ![Radial Profile of jinc-Lanczos FFT](art/fft_janczos_rbf.svg)\
-_Radial profiles of jinc Lanczos-2 and -3 FFTs._
+_Radial profiles of $jinc$ Lanczos-2 and -3 FFTs._
 
 Unfortunately, this filter kernel is computationally intensive as it uses
 the $J_1$ function, which makes it somewhat impractical to use, at least
@@ -277,14 +280,16 @@ not isotropic — and it is **not** an approximation of the radial application o
 Lanczos Wikipedia page is correct.
 
 The correct radial and isotropic Lanczos application uses a modified Lanczos 
-equation which uses _jinc_ instead of _sinc_.
+equation which uses $jinc$ instead of $sinc$.
+
+The radial application of the 1D Lanczos filter, $L_a(\rho)$, is incorrect.
 
 # Anti-aliasing
 
 ## Band-limiting / Nyquist-Shannon
 
 We've seen above that to be able to fully reconstruct the original 2D image
-from its samples, the sampling operation needed to honor the Nyquist-Shannon 
+from its samples, the sampling operation needed to satisfy the Nyquist-Shannon 
 theorem. However, by default, rasterizing a triangle on the GPU does not. 
 This often manifests with moiré patterns in areas of high frequencies.
 
@@ -292,7 +297,7 @@ This often manifests with moiré patterns in areas of high frequencies.
 _Aliasing can be seen in the distance. Low frequencies appear where there
 should be none._
 
-MSAA and mipmaping are Two ways that GPUs can use to help mitigate this during
+MSAA and mipmaping are two ways that GPUs can use to help mitigate this during
 rasterization. MSAA addresses aliasing due to sampling the geometry,
 while mipmapping addresses aliasing due to sampling textures. 
 
@@ -320,8 +325,8 @@ When we sample the image at a higher rate, we effectively push higher the
 frequencies destroyed by the overlap of the replicated spectra. In other words,
 the frequencies that would have been destroyed at the lower sampling rate are
 now intact (or at least not affected as much). Of course, our image is now of 
-higher resolution, so we need to **resample** it. This time however, we first 
-apply a digital low-pass filter, satisfying the Nyquist-Shannon prerequisite.
+higher resolution, so we need to **re-sample** it. This time however, we first 
+apply a digital low-pass filter, satisfying Nyquist-Shannon.
 
 <img src="art/antialiased_checker.png" style="width: 640px; image-rendering: pixelated;">\
 _16x Anti-aliasing using the separable Lanczos-3 low-pass filter. The moiré
@@ -339,5 +344,5 @@ In many TAA implementations, the input samples are said to be "de-jittered"
 before accumulation. That's one way to think about it, but it hides a more
 profound meaning: in reality we're applying a low-pass, band-limiting, filter
 prior to resampling. This is the mathematical justification for SGSR and FSR's
-(incorrect, keep reading) Lanczos-2, or Unreal's (correct) Blackman-Harris 
+(incorrect) Lanczos-2, or Unreal's (correct) Blackman-Harris 
 filters.
