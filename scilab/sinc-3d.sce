@@ -31,7 +31,7 @@ endfunction
 m = 8;
 inc = 0.125;
 [x, y] = meshgrid(-m:inc:m, -m:inc:m);
-f = jinc(x, y) .* (%pi/2);
+f = sinc(%pi*x).*sinc(%pi*y);
 
 F = fftshift(fft2(f));
 magnitude_F = abs(F) * inc^2;
@@ -48,7 +48,7 @@ surf(x(1,:),y(:,1),f);
 xlabel('$x$', 'fontsize', 4);
 ylabel('$y$', 'fontsize', 4);
 zlabel('A');
-title('$jinc(\rho)$', 'fontsize', 4);
+title('$sinc(x) \times sinc(y)$', 'fontsize', 4);
 gca().box = "back_half";
 xgrid;
 

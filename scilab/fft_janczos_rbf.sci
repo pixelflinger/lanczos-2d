@@ -103,8 +103,8 @@ k = linspace(0, k_max, num_points);
 
 // 5. Calculate the Hankel transform
 F_k0 = step(k, %pi);
-F_k1 = hankel_transform(isotropic_function_lanczos2, r, k)';
-F_k2 = hankel_transform(isotropic_function_lanczos3, r, k)';
+F_k1 = hankel_transform(isotropic_function_janczos2, r, k)';
+F_k2 = hankel_transform(isotropic_function_janczos3, r, k)';
 
 
 // 6. Plot the Fourier transform (radial profile)
@@ -112,6 +112,6 @@ scf(0); clf();
 plot(k, [abs(F_k0) abs(F_k1) abs(F_k2)]); 
 xlabel('Radial Frequency');
 ylabel('Magnitude');
-title('Radial Lanczos Frequency Profile');
-hdl = legend("$ideal$", "$lanczos-2$", "$lanczos-3$", %f);
+title('Radial Lanczos (jinc) Frequency Profile');
+hdl = legend("$ideal$", "$janczos-2$", "$janczos-3$", %f);
 hdl.font_size = 4;

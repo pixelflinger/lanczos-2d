@@ -181,7 +181,7 @@ the shape of a square in the frequency domain:
 This corresponds to a **convolution** by the separable, but anisotropic, 
 filter $sinc(x,y) = sinc(x)sinc(y)$ in the spatial domain:
 
-![sinc(x)sinc(y)](art/sinc.png)
+![sinc(x)sinc(y)](art/sinc-3d.png)
 
 This filter is not isotropic, which can be problematic, especially when dealing
 with rotations. The isotropic version of this ideal reconstruction filter has 
@@ -198,12 +198,12 @@ with $jinc(\rho)=J_1(\pi \rho) / \pi \rho$\
 and $J_1$ a [Bessel Function of the First Kind](https://en.wikipedia.org/wiki/Bessel_function#Spherical_Bessel_functions): 
 $J_1(x) = \frac{1}{\pi}\int_0^\pi{cos(n\tau-x sin \tau)d\tau}$
 
-![jinc(x, y)](art/jinc.png)
+![jinc(x, y)](art/jinc-3d.png)
 
 > [!NOTE]
 > This is not the same as the _sinc_ filter:
 > 
-> ![filters.svg](art/filters.svg)
+> ![jinc vs sinc](art/jinc_vs_sinc.svg)
 
 > [!WARNING]
 > The _sinc_ filter (as opposed to  _jinc_) yields to a wrong

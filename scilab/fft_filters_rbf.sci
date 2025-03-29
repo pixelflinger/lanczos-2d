@@ -1,5 +1,10 @@
 clear;
 
+function y = step(x, n)
+    y(x<n) = 1;
+    y(x>=n) = 0;
+endfunction
+
 function y = jinc(x)
     y = besselj(1, %pi * x)./(%pi * x)
     y(x == 0) = 0.5; 
@@ -89,7 +94,7 @@ k_max = 2*%pi; // Maximum radial frequency
 k = linspace(0, k_max, num_points);
 
 // 5. Calculate the Hankel transform
-F_k0 = hankel_transform(isotropic_function_jinc, r, k)';
+F_k0 = step(k, %pi);
 F_k1 = hankel_transform(isotropic_function_jancos2, r, k)';
 F_k2 = hankel_transform(isotropic_function_tri2, r, k)';
 F_k3 = hankel_transform(isotropic_function_rect2, r, k)';
@@ -101,4 +106,5 @@ plot(k, [abs(F_k0) abs(F_k1) abs(F_k2) abs(F_k3)]);
 xlabel('Radial Frequency (k)');
 ylabel('Magnitude');
 title('Hankel Transform (Radial Profile)');
-legend("jinc", "lanczos-2", "tent", "box");
+hdl = legend("$jinc$", "$lanczos-2$", "$tent$", "$box$", %f);
+hdl.font_size = 4;
