@@ -163,7 +163,7 @@ domain, the image's spectrum (top-right) is **convolved** by the comb's spectrum
 > [!NOTE]
 > The images above are a simulation of sampling an analog image. In reality,
 > and as stated above, the spectrum of the image is replicated in all directions
-> forever (i.e: it's not limited to $[-2,2]$).
+> forever (i.e: it's not limited to $[-4, 4]$).
 
 The key idea to visualize here is that the spectrum is replicated on a 
 **regular grid**.
@@ -181,7 +181,7 @@ the shape of a square in the frequency domain:
 This corresponds to a **convolution** by the separable, but anisotropic, 
 filter $sinc(x,y) = sinc(x)sinc(y)$ in the spatial domain:
 
-![sinc(x)sinc(y)](art/sinc-3d.png)
+![sinc(x)sinc(y)](art/sinc-3d.svg)
 
 This filter is not isotropic, which can be problematic, especially when dealing
 with rotations. The isotropic version of this ideal reconstruction filter has 
@@ -198,7 +198,7 @@ with $jinc(\rho)=J_1(\pi \rho) / \pi \rho$\
 and $J_1$ a [Bessel Function of the First Kind](https://en.wikipedia.org/wiki/Bessel_function#Spherical_Bessel_functions): 
 $J_1(x) = \frac{1}{\pi}\int_0^\pi{cos(n\tau-x sin \tau)d\tau}$
 
-![jinc(x, y)](art/jinc-3d.png)
+![jinc(x, y)](art/jinc-3d.svg)
 
 > [!NOTE]
 > This is not the same as the _sinc_ filter:
@@ -329,7 +329,7 @@ higher resolution, so we need to **re-sample** it. This time however, we first
 apply a digital low-pass filter, satisfying Nyquist-Shannon.
 
 <img src="art/antialiased_checker.png" style="width: 640px; image-rendering: pixelated;">\
-_16x Anti-aliasing using the separable Lanczos-3 low-pass filter. The moiré
+_256x Anti-aliasing using the separable Lanczos-2 low-pass filter. The moiré
 pattern is reduced._
 
 This is why "good" anti-aliasing is not "just the average" of the samples taken
