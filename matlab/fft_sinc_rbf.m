@@ -15,7 +15,7 @@ F_k0 = hankel_transform(@isotropic_function_sinc, r, k)';
 
 % Plot the Fourier transform (radial profile)
 figure(1); clf; 
-plot(k, [ftsinc(k)']); 
+plot(k, ftsinc(k)'); 
 xlabel('Radial Frequency (radian/length)', 'FontSize', 16);
 ylabel('Magnitude', 'FontSize', 16);
 title('Radial sinc Frequency Profile', 'FontSize', 16);
@@ -25,17 +25,6 @@ grid on;
 grid minor;
 
 % --- Helper Function Definitions ---
-
-function y = step(x, cutoff_k)
-    y = zeros(size(x)); % Initialize output array with zeros
-    y(x < cutoff_k) = 1;
-end
-
-function y = sinc(x)
-    v = pi * x;
-    y = sin(v) ./ v;
-    y(x==0) = 1;
-end
 
 % closed-form of the sinc fourier transform
 function y = ftsinc(r)
@@ -67,6 +56,6 @@ end
 % --- Isotropic function definitions used by hankel_transform ---
 
 function y = isotropic_function_sinc(r)
-    y = sinc(r);
+    y = Kernels.sinc(r);
 end
 

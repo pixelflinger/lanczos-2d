@@ -14,7 +14,7 @@ title("Lanczos-2", 'FontSize', 16)
 
 hold on;
 
-plot(x, lanczos(2, x-S) .* sy(S+1), ...
+plot(x, Kernels.lanczos(2, x-S) .* sy(S+1), ...
     'LineWidth', 1, ...
     'Color', 'red'); 
 
@@ -28,15 +28,3 @@ hold off;
 grid on;
 grid minor
 
-% --- Helper Function Definitions ---
-
-function y = sinc(x)
-    v = pi * x;
-    y = sin(v) ./ v;
-    y(x==0) = 1;
-end
-
-function y = lanczos(n, x)
-    y = sinc(x).*sinc(x/n);
-    y(abs(x)>n) = 0;
-end

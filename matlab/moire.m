@@ -125,21 +125,6 @@ axis image; % Fit the axes bounds tightly around the data
 
 % --- Helper Function Definitions ---
 
-function y = sinc(x)
-    if (x == 0)
-        y = 1;
-    end
-    y = sin(x)/x;
-end
-
-function y = lanczos(n, x)
-    if abs(x) > n
-        y = 0;
-        return
-    end
-    y = sinc(pi.*x).*sinc(pi.*x/n);
-end
-
 function smoothed_image = lanczos3_filter(image, n, ssaa_factor)
     image = double(image);
     
@@ -147,7 +132,7 @@ function smoothed_image = lanczos3_filter(image, n, ssaa_factor)
     kernel_size = (n * 2) * ssaa_factor;
     kernel1d = zeros(1, kernel_size);
     for i = 1:kernel_size
-        kernel1d(i) = lanczos(n, (i - (kernel_size / 2 + 0.5)) ./ ssaa_factor);
+        kernel1d(i) = Kernels.lanczos(n, (i - (kernel_size / 2 + 0.5)) ./ ssaa_factor);
     end
 
     % Normalize the 1D Kernel

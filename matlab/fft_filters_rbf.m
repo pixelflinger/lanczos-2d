@@ -11,7 +11,7 @@ k_max = 2*pi; % Maximum radial frequency
 k = linspace(0, k_max, num_points);
 
 % Calculate the Hankel transforms
-F_k0 = step(k, pi)';
+F_k0 = Kernels.step(k, pi)';
 F_k1 = hankel_transform(@isotropic_function_janczos2, r, k)';
 F_k2 = hankel_transform(@isotropic_function_tri2, r, k)';
 F_k3 = hankel_transform(@isotropic_function_rect2, r, k)';
@@ -26,42 +26,6 @@ lgd = legend('$jinc$', '$janczos-2$', '$tent$', '$box$', 'Location', 'best');
 set(lgd, 'Interpreter', 'latex', 'FontSize', 20, 'Box', 'off');
 grid on;
 grid minor;
-
-% --- Helper Function Definitions ---
-
-function y = step(x, cutoff_k)
-    y = zeros(size(x)); % Initialize output array with zeros
-    y(x < cutoff_k) = 1;
-end
-
-function y = jinc(x)
-    y = besselj(1, pi * x)./(pi * x);
-    y(x == 0) = 0.5; 
-end
-
-function y = janczos(n, x)
-    if abs(x) > n
-        y = 0;
-        return
-    end
-    y = pi * jinc(x).*jinc(x/n);
-end
-
-function w = triangle(n, r)
-    if abs(r) > n
-        w = 0;
-        return
-    end
-    w = (1 - abs(r) / n) / (pi * n^2 / 3);
-end
-
-function w = rectangle(n, r)
-    if abs(r) > n
-        w = 0;
-        return
-    end
-    w = 1 / (pi * n^2);
-end
 
 function H = hankel_transform(f_handle, r_values, k_values)
     % Calculates the 0-th order Hankel transform using numerical integration.
@@ -88,13 +52,13 @@ end
 % --- Isotropic function definitions used by hankel_transform ---
 
 function y = isotropic_function_janczos2(r)
-    y = janczos(2, r);
+    y = Kernels.janczos(2, r);
 end
 
 function y = isotropic_function_tri2(r)
-    y = triangle(1, r);
+    y = Kernels.triangle(1, r);
 end
 
 function y = isotropic_function_rect2(r)
-    y = rectangle(1, r);
+    y = Kernels.rectangle(1, r);
 end
