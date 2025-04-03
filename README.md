@@ -19,6 +19,9 @@
 * [Anti-aliasing](#anti-aliasing)
   * [Band-limiting / Nyquist-Shannon](#band-limiting--nyquist-shannon)
     * [What is anti-aliasing?](#what-is-anti-aliasing)
+  * [Temporal Anti-aliasing](#temporal-anti-aliasing-1)
+    * [Spatial Anti-aliasing filter](#spatial-anti-aliasing-filter)
+    * [Temporal Anti-aliasing filter](#temporal-anti-aliasing-filter)
 <!-- TOC -->
 
 ## Introduction
@@ -207,7 +210,7 @@ $J_1(x) = \frac{1}{\pi}\int_0^\pi{cos(n\tau-x sin \tau)d\tau}$
 
 > [!WARNING]
 > The _sinc_ filter (as opposed to  _jinc_) yields to a wrong
-> "reconstruction" filter that ends-up significantly sharpening the image's 
+> "reconstruction" filter that ends up significantly sharpening the image's
 > high-frequencies:
 >
 > ![Radial Profile of sinc's FFT](art/fft_sinc_rbf.svg)
@@ -220,7 +223,7 @@ band-limited (i.e. doesn't have spectral content outside of that disk).
 > [!NOTE]
 > We just described the **ideal reconstruction filter**. It cannot be
 > implemented in practice because it requires infinite support (i.e. infinite
-> length). Instead, we use a windowed version of the ideal filter,
+> length). Instead, we use a windowed version of the ideal filter, 
 > such as Lanczos, or other low-pass filters.
 
 ### Just for fun...
@@ -232,7 +235,7 @@ band-limited in the first place:
 
 ![reconstruction](art/reconstruction.svg)\
 _Reconstruction of an improperly band-limited image, using a truncated 
-ideal sinc filter, yields to anisotropic ringing artifacts_
+ideal sinc filter, yields to anisotropic ringing artifacts._
 
 ## Recap
 
@@ -263,7 +266,7 @@ Lanczos filter which, unsurprisingly, uses the $jinc$ function:
 ```math
 L_a(\rho) = \left\{ \begin{array}{cl} \pi jinc(\rho)jinc(\rho/a) & if \ |\rho| \lt a \\ 0 & otherwise \end{array} \right.
 ```
-with $jinc(\rho)=J_1(\pi \rho) / \pi  r$
+with $jinc(\rho)=J_1(\pi \rho) / \pi \rho$
 
 ![Radial Profile of jinc-Lanczos FFT](art/fft_janczos_rbf.svg)\
 _Radial profiles of $jinc$ Lanczos-2 and -3 FFTs._
@@ -271,7 +274,7 @@ _Radial profiles of $jinc$ Lanczos-2 and -3 FFTs._
 Unfortunately, this filter kernel is computationally intensive as it uses
 the $J_1$ function, which makes it somewhat impractical to use, at least
 without using a lookup table.
-
+ 
 ## Conclusion
 
 The separable application of the Lanczos filter is actually correct — albeit 
@@ -281,7 +284,7 @@ Lanczos Wikipedia page is correct.
 
 The correct radial and isotropic Lanczos application uses a modified Lanczos 
 equation which uses $jinc$ instead of $sinc$.
-
+ 
 The radial application of the 1D Lanczos filter, $L_a(\rho)$, is incorrect.
 
 # Anti-aliasing
@@ -294,7 +297,7 @@ theorem. However, by default, rasterizing a triangle on the GPU does not.
 This often manifests with moiré patterns in areas of high frequencies.
 
 <img src="art/aliased_checker.png" style="width: 640px; image-rendering: pixelated;">\
-_Aliasing can be seen in the distance. Low frequencies appear where there
+_Aliasing can be seen in the distance. Low frequencies appear where there 
 should be none._
 
 MSAA and mipmaping are two ways that GPUs can use to help mitigate this during
@@ -310,7 +313,7 @@ MSAA and mipmapping effectively approximate sampling a band-limited image.
 > [!NOTE]
 > This explains why most spatial upscalers, such as FSR1 or SGSR1, work
 > better with a "well anti-aliased" source image, a properly
-> band-limited sampled image. Such an image can be better reconstructed 
+> band-limited sampled image. Such an image can be better reconstructed
 > according to Nyquist-Shannon. In essence, the sampled image has more
 > high-frequency information preserved (i.e.: it contains more of the 
 > original image). 
@@ -318,7 +321,7 @@ MSAA and mipmapping effectively approximate sampling a band-limited image.
 ### What is anti-aliasing?
 
 Mathematically, anti-aliasing corresponds to sampling the signal (here an image)
-at a higher rate and applying a low-pass filter to that (this is called
+at a higher rate and applying a low-pass filter to that (this is called 
 super-sampling anti-aliasing, or SSAA).
 
 When we sample the image at a higher rate, we effectively push higher the
@@ -344,5 +347,46 @@ In many TAA implementations, the input samples are said to be "de-jittered"
 before accumulation. That's one way to think about it, but it hides a more
 profound meaning: in reality we're applying a low-pass, band-limiting, filter
 prior to resampling. This is the mathematical justification for SGSR and FSR's
-(incorrect) Lanczos-2, or Unreal's (correct) Blackman-Harris 
+(incorrect) Lanczos-2, or Unreal's (correct) Blackman-Harris
 filters.
+
+## Temporal Anti-aliasing
+
+We can do all the analysis in one dimension because we've seen earlier that we
+can use separable reconstruction filters, which consists of 1-D filters
+applied horizontally first and then vertically.
+
+### Spatial Anti-aliasing filter
+
+First let's look at the spatial-only case. We render the image at a higher 
+resolution, for instance 4x, and reconstruct an anti-aliased sample by applying 
+a low-pass filter, for example Lanczos-2. This precisely corresponds to the 
+figure below:
+
+![aa_filter_spatial.svg](art/aa_filter_spatial.svg)
+
+The anti-aliased sample is reconstructed by calculating the weighted-sum of
+each high-resolution sample by the kernel value at that sample location. This 
+is called a **convolution**.
+
+Notice that the kernel is centered on the sample to be reconstructed, and the
+width of its first lobe is two low-resolution (anti-aliased) pixels. This
+exactly matches a reconstruction filter for the target resolution image.
+
+### Temporal Anti-aliasing filter
+
+Let's see how this changes in the temporal case.
+
+![aa_filter_temporal.svg](art/aa_filter_temporal.svg)
+
+Here we only get a subset of the samples each frame, but we apply exactly 
+the same filter: it has the same center and size as before. 
+
+> This is what is often called "unjittering" in many TAA implementations (because 
+we need to offset the kernel by the jitter-offset to keep it centered on the 
+target pixel-center). "Unjittering" is a bit of a misnomer, as all we're doing
+is keeping the **kernel** centered on the target pixel.
+
+Each frame is calculating a partial result which gets accumulated to the
+target pixel, converging to the average over time and producing **exactly**
+the same result as the spatial version, because addition is commutative.
