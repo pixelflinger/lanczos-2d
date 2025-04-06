@@ -343,7 +343,7 @@ low-pass filter:
 _Examples of various filters frequency response profiles. We use the radial
 version of filters for illustration._
 
-In many TAA implementations, the input samples are said to be "de-jittered" 
+In many TAA implementations, the input samples are said to be "unjittered" 
 before accumulation. That's one way to think about it, but it hides a more
 profound meaning: in reality we're applying a low-pass, band-limiting, filter
 prior to resampling. This is the mathematical justification for SGSR and FSR's
@@ -359,9 +359,15 @@ applied horizontally first and then vertically.
 ### Spatial Anti-aliasing filter
 
 First let's look at the spatial-only case. We render the image at a higher 
-resolution, for instance 4x, and reconstruct an anti-aliased sample by applying 
-a low-pass filter, for example Lanczos-2. This precisely corresponds to the 
-figure below:
+resolution than the desired output resolution, for instance 4x. The higher 
+sampling rate allows higher frequencies in the image to be preserved by
+the sampling process, instead of being _folded back_ into the image due to
+the spectrum replication discussed earlier.
+
+The output image is then reconstructed by applying a low-pass filter satisfying
+the Nyquist frequency at the output resolution. Output, anti-aliased, 
+samples are reconstructed one at a time by applying the low-pass filter, 
+for example Lanczos-2. This precisely corresponds to the figure below:
 
 ![aa_filter_spatial.svg](art/aa_filter_spatial.svg)
 
@@ -370,17 +376,26 @@ each high-resolution sample by the kernel value at that sample location. This
 is called a **convolution**.
 
 Notice that the kernel is centered on the sample to be reconstructed, and the
-width of its first lobe is two low-resolution (anti-aliased) pixels. This
-exactly matches a reconstruction filter for the target resolution image.
+width of its first lobe is two low-resolution (anti-aliased) pixels. **This
+exactly matches the corresponding reconstruction filter for the target 
+resolution image.**
 
 ### Temporal Anti-aliasing filter
 
 Let's see how this changes in the temporal case.
 
+Temporal anti-aliasing aims to spread the filter computation over multiple 
+frames. Each frame is rendered at the _same_ resolution (i.e. sampling rate) as
+the target image, but is offset in order to take a different sample. A partial 
+filter is applied and the result is accumulated into the output image, which 
+over time, converges to the same result as the spatial case:
+
+
 ![aa_filter_temporal.svg](art/aa_filter_temporal.svg)
 
-Here we only get a subset of the samples each frame, but we apply exactly 
-the same filter: it has the same center and size as before. 
+Here we only get a subset of the samples each frame (specifically just one per
+output pixel), but we apply exactly the same filter: it has the same center 
+and size as before. 
 
 > This is what is often called "unjittering" in many TAA implementations (because 
 we need to offset the kernel by the jitter-offset to keep it centered on the 
@@ -390,3 +405,23 @@ is keeping the **kernel** centered on the target pixel.
 Each frame is calculating a partial result which gets accumulated to the
 target pixel, converging to the average over time and producing **exactly**
 the same result as the spatial version, because addition is commutative.
+
+#### Caveat
+
+In practice when using the Lanczos filter (or other filters that have negative
+lobes), the temporal version of anti-aliasing doesn't converge to the same 
+value as the spatial-only version.
+
+This is because after applying the filter, we need ensure the resulting
+sample is not negative. This is called "deringing". A negative output from 
+Lanczos is possible because of its negative weights. This typically happens 
+in areas of high contrast:
+
+![lanczos_ringing.svg](art/lanczos_ringing.svg)\
+_Lanczos-2 produces a negative output sample._
+
+The deringing operation is not linear and not commutative. In practice we 
+often ignore this problem. A solution is to use a filter without negative
+lobes, but they generally produce a blurrier image.
+
+### Temporal Upscaling & Anti-aliasing filter
