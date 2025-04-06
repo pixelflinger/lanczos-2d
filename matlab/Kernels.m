@@ -30,19 +30,35 @@ classdef Kernels
             y(abs(x)>n) = 0;
         end
 
-        function y = janczos(n, x)
-            y = pi * Kernels.jinc(x) .* Kernels.jinc(x/n);
+        function y = janczos(n, r)
+            y = pi * Kernels.jinc(r) .* Kernels.jinc(r/n);
+            y(abs(r)>n) = 0;
+        end
+        
+        function y = triangle(n, x)
+            y = (1 - abs(x) / n) / (pi * n^2 / 3);
             y(abs(x)>n) = 0;
         end
         
-        function w = triangle(n, r)
-            w = (1 - abs(r) / n) / (pi * n^2 / 3);
-            w(abs(r)>n) = 0;
+        function y = rectangle(n, x)
+            y = 1 / (pi * n^2);
+            y(abs(x)>n) = 0;
         end
-        
-        function w = rectangle(n, r)
-            w = 1 / (pi * n^2);
-            w(abs(r)>n) = 0;
+
+        function y = gaussian(n, x)
+            w = sqrt(n / pi);
+            y =  w * exp(-a * (x.^2));
+        end
+
+        function y = blackmanharris(N, x)
+            x = x - N / 2;
+            a0 = 0.35875;
+            a1 = 0.48829;
+            a2 = 0.14128;
+            a3 = 0.01168;
+            w = 1 / (N * a0);
+            y = w * (a0 - a1 * cos(2*pi*x / N) + a2 * cos(4*pi*x / N) - a3 * cos(6*pi*x / N));        
+            y(abs(x + N/2) >= N/2) = 0;
         end
     end
 end
