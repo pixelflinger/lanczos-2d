@@ -3,6 +3,7 @@ clear;
 function y = kernel(x)
     y = Kernels.lanczos(2, x);
     %y = Kernels.triangle(1, x);
+    %y = Kernels.gaussian(2.29, x);
 end
 
 N = 20;

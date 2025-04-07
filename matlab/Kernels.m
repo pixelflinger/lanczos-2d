@@ -47,7 +47,7 @@ classdef Kernels
 
         function y = gaussian(n, x)
             w = sqrt(n / pi);
-            y =  w * exp(-a * (x.^2));
+            y =  w * exp(-n * (x.^2));
         end
 
         function y = blackmanharris(N, x)
