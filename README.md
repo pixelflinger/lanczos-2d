@@ -293,8 +293,23 @@ The radial application of the 1D Lanczos filter, $L_a(\rho)$, is incorrect.
 
 We've seen above that to be able to fully reconstruct the original 2D image
 from its samples, the sampling operation needed to satisfy the Nyquist-Shannon 
-theorem. However, by default, rasterizing a triangle on the GPU does not. 
-This often manifests with moiré patterns in areas of high frequencies.
+theorem. Failing to do so causes the part of the spectrum above the Nyquist
+frequency to _fold back_ onto the part of the spectrum below it, effectively 
+_destroying_ that part of the signal. This folding is due to the [infinite
+replication](#the-effect-of-sampling) of the spectrum at every multiple of the 
+Nyquist frequency.
+
+Below is an illustration of this effect in 1-D. This shows the spectrum over
+time of a frequency sweep between 0 and 6KHz, for a sampling rate of 10KHz.
+The Nyquist frequency is therefore 5KHz, and the part of the spectrum between
+5KHz and 6KHz is _folded back_ around 5KHz, destroying the signal between 4KHz
+and 5KHz.
+
+![aliased_chirp.svg](art/aliased_chirp.svg)
+
+By default, rasterizing a triangle on the GPU does not satisfy the 
+Nyquist-Shannon constraint, and this often manifests with moiré patterns in areas 
+of high frequencies, which become **unrecoverable**.
 
 <img src="art/aliased_checker.png" style="width: 640px; image-rendering: pixelated;">\
 _Aliasing can be seen in the distance. Low frequencies appear where there 
