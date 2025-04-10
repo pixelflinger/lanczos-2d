@@ -22,6 +22,13 @@
   * [Temporal Anti-aliasing](#temporal-anti-aliasing-1)
     * [Spatial Anti-aliasing filter](#spatial-anti-aliasing-filter)
     * [Temporal Anti-aliasing filter](#temporal-anti-aliasing-filter)
+      * [Caveats](#caveats)
+        * [Normalization weights](#normalization-weights)
+        * [Filter Kernel with negative lobes](#filter-kernel-with-negative-lobes)
+    * [Temporal Upscaling & Anti-aliasing filter](#temporal-upscaling--anti-aliasing-filter)
+      * [Caveats](#caveats-1)
+        * [Normalization weights](#normalization-weights-1)
+        * [Deringing](#deringing)
 <!-- TOC -->
 
 ## Introduction
@@ -358,13 +365,6 @@ low-pass filter:
 _Examples of various filters frequency response profiles. We use the radial
 version of filters for illustration._
 
-In many TAA implementations, the input samples are said to be "unjittered" 
-before accumulation. That's one way to think about it, but it hides a more
-profound meaning: in reality we're applying a low-pass, band-limiting, filter
-prior to resampling. This is the mathematical justification for SGSR and FSR's
-(incorrect) Lanczos-2, or Unreal's (correct) Blackman-Harris
-filters.
-
 ## Temporal Anti-aliasing
 
 We can do all the analysis in one dimension because we've seen earlier that we
@@ -388,7 +388,13 @@ for example Lanczos-2. This precisely corresponds to the figure below:
 
 The anti-aliased sample is reconstructed by calculating the weighted-sum of
 each high-resolution sample by the kernel value at that sample location. This 
-is called a **convolution**.
+is called a **convolution**:
+
+$$\bar{s}[j] = \frac{1}{K} \sum_{i=-N}^{N}s[j-i]w_i$$
+
+Importantly, the result needs to be normalized by the sum of the kernel weights:
+
+$$K = \sum_{i=-N}^{N}w_i$$
 
 Notice that the kernel is centered on the sample to be reconstructed, and the
 width of its first lobe is two low-resolution (anti-aliased) pixels. **This
@@ -399,38 +405,68 @@ resolution image.**
 
 Let's see how this changes in the temporal case.
 
-Temporal anti-aliasing aims to spread the filter computation over multiple 
-frames. Each frame is rendered at the _same_ resolution (i.e. sampling rate) as
+Temporal anti-aliasing spreads the filter computation over multiple 
+frames. Each frame is rendered at the _same_ resolution — or sampling rate — as
 the target image, but is offset in order to take a different sample. A partial 
-filter is applied and the result is accumulated into the output image, which 
-over time, converges to the same result as the spatial case:
-
+low-pass filter is applied and the result is accumulated to the output image, 
+which over time, converges to _nearly_ the same result as the spatial case:
 
 ![aa_filter_temporal.svg](art/aa_filter_temporal.svg)
 
-Here we only get a subset of the samples each frame (specifically just one per
-output pixel), but we apply exactly the same filter: it has the same center 
+Here we get a subset of the samples each frame, specifically one per
+output pixel, but we apply exactly the same filter: it has the same center 
 and size as before. 
 
 > This is what is often called "unjittering" in many TAA implementations (because 
-we need to offset the kernel by the jitter-offset to keep it centered on the 
+the kernel is offset by the jitter-offset to keep it centered on the 
 target pixel-center). "Unjittering" is a bit of a misnomer, as all we're doing
 is keeping the **kernel** centered on the target pixel.
 
-Each frame is calculating a partial result which gets accumulated to the
-target pixel, converging to the average over time and producing **exactly**
-the same result as the spatial version, because addition is commutative.
+Each frame is calculating a _partial_ result, $r[i]$, which gets accumulated to the
+target pixel, $h[i-1]$, converging to the **average** over time and producing **nearly**
+the same result as the spatial version:
 
-#### Caveat
+$$h[i] = (1 - \alpha) \cdot h[i-1] + \alpha \cdot r[i]$$
 
-In practice when using the Lanczos filter (or other filters that have negative
-lobes), the temporal version of anti-aliasing doesn't converge to the same 
-value as the spatial-only version.
+$$h[i] = \alpha \sum_{k=0}^{\infty}(1-\alpha)^k r[i-k]$$
 
-This is because after applying the filter, we need ensure the resulting
-sample is not negative. This is called "deringing". A negative output from 
-Lanczos is possible because of its negative weights. This typically happens 
-in areas of high contrast:
+Because $r[i]$ is periodic (i.e.: $r[i] = r[i-n]$), we can show that:
+
+$$h[i] = \alpha \sum_{k=0}^{\infty}{(1-\alpha)^{k \cdot n}} \sum_{k=0}^{n-1}(1-\alpha)^k r[i-k]$$
+
+$$h[i] = \frac{\alpha}{1 - (1 - \alpha)^n} \sum_{k=0}^{n-1}(1-\alpha)^k r[i-k]$$
+
+And finally, when $\alpha \rightarrow 0$, this expression becomes:
+
+$$h[i] = \frac{1}{n} \sum_{k=0}^{n-1}r[i-k]$$
+
+which is the **average** of $r[i]$.
+
+So in the end, the partial filter results are essentially averaged, converging
+to nearly the same result as the spatial-only anti-aliasing computation.
+
+#### Caveats
+
+##### Normalization weights
+
+There is a _slight_ difference however because the convolution normalization 
+factor is applied on the partial result at each frame, and the weight-sum
+is not equal to the average of the partial weight-sums:
+
+$$\sum_{i}^{N}{w_i} \ne Avg(\sum_{j}^{M}{w_j})$$
+
+However, if $\sum w_j$ are all similar, the above becomes an
+equality, and in practice it is often close to 1. We can also compensate
+for this by modulating the accumulation factor by the partial weight sum 
+$\sum w_j$. This makes intuitive sense; when the weight sum is lower, these 
+samples contributed less to the final filter result.
+
+##### Filter Kernel with negative lobes
+
+In practice when using filters that have negative lobes, like the Lanczos 
+filter, we need to ensure that the resulting sample is not negative. This is 
+called "deringing". A negative output from Lanczos is possible because of its 
+negative weights. This typically happens in areas of high contrast:
 
 ![lanczos_ringing.svg](art/lanczos_ringing.svg)\
 _Lanczos-2 produces a negative output sample._
@@ -440,3 +476,43 @@ often ignore this problem. A solution is to use a filter without negative
 lobes, but they generally produce a blurrier image.
 
 ### Temporal Upscaling & Anti-aliasing filter
+
+Something to realize is that temporal upscaling like FSR-2 and others, is not
+actually **upscaling**, as in "resampling", or as in "video upscaling", it is in 
+fact just good old _temporal anti-aliasing_, except that we produce less samples 
+**per frame**, but ultimately, all samples are available. This is why the
+term "super resolution" is more appropriate.
+
+In the example below, each frame produces half as many samples, so we need
+twice the number of frames to converge to the same result.
+
+Critically, the width of the filter is **unchanged** compared to the TAA case;
+it is still sized like a reconstruction filter at the **output** resolution:
+
+![sr_filter_temporal.svg](art/sr_filter_temporal.svg)
+
+> Many upscaling TAA implementations use a filter sized for the **input**
+> resolution — which in my opinion is incorrect — to compensate for this, they 
+> modulate the history accumulation factor (often called $alpha$) based on the
+> distance of the sample to the reconstructed pixel center. Doing so overly
+> blurs the input.
+
+#### Caveats
+
+##### Normalization weights
+
+Because the partial filter is now computed with less samples, while keeping 
+the same support, we can end-up with a partial result where the normalization
+factor is much smaller than 1. This is a **key** difference compared to TAA. 
+We can no longer assume that averaging the partial results is correct. 
+It becomes essential to modulate the $\alpha$ parameter by the partial weight.
+
+> Each partial filter computation can be thought of computing a low-pass filter
+> with a cutoff frequency _above_ the Nyquist frequency.
+
+##### Deringing
+
+Just like with the TAA case, deringing is a problem, and it is in fact more of
+a problem with upscaling, as intermediate frames are more prone to 
+outputting a negative sample, because some of them lack a a sample with a
+strong positive weight.
