@@ -1,8 +1,7 @@
-# Correct application of the Lanczos filter in 2D
-
 <!-- TOC -->
-* [Correct application of the Lanczos filter in 2D](#correct-application-of-the-lanczos-filter-in-2d)
-  * [Introduction](#introduction)
+* [Introduction](#introduction)
+* [Correct 2D Lanczos filter application](#correct-2d-lanczos-filter-application)
+  * [Preamble](#preamble)
     * [Temporal Anti-aliasing](#temporal-anti-aliasing)
     * [Temporal Anti-aliasing + Upscaling](#temporal-anti-aliasing--upscaling)
     * [Lanczos](#lanczos)
@@ -18,33 +17,47 @@
   * [Conclusion](#conclusion)
 * [Anti-aliasing](#anti-aliasing)
   * [Band-limiting / Nyquist-Shannon](#band-limiting--nyquist-shannon)
-    * [What is anti-aliasing?](#what-is-anti-aliasing)
-  * [Temporal Anti-aliasing](#temporal-anti-aliasing-1)
-    * [Spatial Anti-aliasing filter](#spatial-anti-aliasing-filter)
-    * [Temporal Anti-aliasing filter](#temporal-anti-aliasing-filter)
-      * [Caveats](#caveats)
-        * [Normalization weights](#normalization-weights)
-        * [Filter Kernel with negative lobes](#filter-kernel-with-negative-lobes)
-    * [Temporal Upscaling & Anti-aliasing filter](#temporal-upscaling--anti-aliasing-filter)
-      * [Caveats](#caveats-1)
-        * [Normalization weights](#normalization-weights-1)
-        * [Deringing](#deringing)
+  * [What is anti-aliasing?](#what-is-anti-aliasing)
+  * [Spatial anti-aliasing filter](#spatial-anti-aliasing-filter)
+* [Temporal Anti-aliasing](#temporal-anti-aliasing-1)
+  * [Temporal anti-aliasing filter](#temporal-anti-aliasing-filter)
+    * [Averaging & Normalization weights](#averaging--normalization-weights)
+    * [Caveat](#caveat)
+      * [Filter Kernel with negative lobes](#filter-kernel-with-negative-lobes)
+  * [Temporal Upscaling & Anti-aliasing filter](#temporal-upscaling--anti-aliasing-filter)
+    * [Caveats](#caveats)
+      * [Normalization weights](#normalization-weights)
+      * [Deringing](#deringing)
+* [Conclusions](#conclusions)
+  * [2D lanczos applications](#2d-lanczos-applications)
+  * [TAA history accumulation feedback parameter](#taa-history-accumulation-feedback-parameter)
+  * [TAA upscaling filter support](#taa-upscaling-filter-support)
 <!-- TOC -->
 
-## Introduction
+# Introduction
 
-[Filament](https://github.com/google/filament) is an open-source 
-Physically Based Renderer (PBR) targeting mobile platforms, 
-[Android](https://www.android.com/) in particular. It features basic 
+[Filament](https://github.com/google/filament) is an open-source
+Physically Based Renderer (PBR) targeting mobile platforms,
+[Android](https://www.android.com/) in particular. It features basic
 implementations of temporal anti-aliasing (TAA) and upscaling.
+
+Below we discuss a few implementation details of temporal anti-aliasing and
+upscaling:
+- The correct 2D application of the Lanczos filter.
+- The shape, size and position of the anti-aliasing filter.
+- The history feedback parameter.
 
 > [!NOTE]
 > [A Survey of Temporal Antialiasing Techniques](http://behindthepixels.io/assets/files/TemporalAA.pdf)
 > is an excellent starting point if you're not familiar with temporal antialiasing and upscaling.
 
+# Correct 2D Lanczos filter application
+
+## Preamble
+
 ### Temporal Anti-aliasing
 
-Temporal Anti-Aliasing implementations need to sample both the input and
+Temporal anti-aliasing implementations need to sample both the input and
 history buffers at arbitrary texture coordinates due to jittering and 
 reprojection respectively. Bilinear sampling is inadequate because it results 
 in an overly blurred image and exhibits anisotropic artifacts. 
@@ -215,7 +228,7 @@ $J_1(x) = \frac{1}{\pi}\int_0^\pi{cos(n\tau-x sin \tau)d\tau}$
 > 
 > ![jinc vs sinc](art/jinc_vs_sinc.svg)
 
-> [!WARNING]
+> [!IMPORTANT]
 > The _sinc_ filter (as opposed to  _jinc_) yields to a wrong
 > "reconstruction" filter that ends up significantly sharpening the image's
 > high-frequencies:
@@ -276,7 +289,7 @@ L_a(\rho) = \left\{ \begin{array}{cl} \pi jinc(\rho)jinc(\rho/a) & if \ |\rho| \
 with $jinc(\rho)=J_1(\pi \rho) / \pi \rho$
 
 ![Radial Profile of jinc-Lanczos FFT](art/fft_janczos_rbf.svg)\
-_Radial profiles of $jinc$ Lanczos-2 and -3 FFTs._
+_Radial profiles of_ $jinc$ _Lanczos-2 and -3 FFTs._
 
 Unfortunately, this filter kernel is computationally intensive as it uses
 the $J_1$ function, which makes it somewhat impractical to use, at least
@@ -340,7 +353,7 @@ MSAA and mipmapping effectively approximate sampling a band-limited image.
 > high-frequency information preserved (i.e.: it contains more of the 
 > original image). 
 
-### What is anti-aliasing?
+## What is anti-aliasing?
 
 Mathematically, anti-aliasing corresponds to sampling the signal (here an image)
 at a higher rate and applying a low-pass filter to that (this is called 
@@ -365,29 +378,23 @@ low-pass filter:
 _Examples of various filters frequency response profiles. We use the radial
 version of filters for illustration._
 
-## Temporal Anti-aliasing
+## Spatial anti-aliasing filter
 
-We can do all the analysis in one dimension because we've seen earlier that we
-can use separable reconstruction filters, which consists of 1-D filters
-applied horizontally first and then vertically.
-
-### Spatial Anti-aliasing filter
-
-First let's look at the spatial-only case. We render the image at a higher 
-resolution than the desired output resolution, for instance 4x. The higher 
+We render the image at a higher
+resolution than the desired output resolution, for instance 4x. The higher
 sampling rate allows higher frequencies in the image to be preserved by
 the sampling process, instead of being _folded back_ into the image due to
 the spectrum replication discussed earlier.
 
 The output image is then reconstructed by applying a low-pass filter satisfying
-the Nyquist frequency at the output resolution. Output, anti-aliased, 
-samples are reconstructed one at a time by applying the low-pass filter, 
+the Nyquist frequency at the output resolution. Output, anti-aliased,
+samples are reconstructed one at a time by applying the low-pass filter,
 for example Lanczos-2. This precisely corresponds to the figure below:
 
 ![aa_filter_spatial.svg](art/aa_filter_spatial.svg)
 
 The anti-aliased sample is reconstructed by calculating the weighted-sum of
-each high-resolution sample by the kernel value at that sample location. This 
+each high-resolution sample by the kernel value at that sample location. This
 is called a **convolution**:
 
 $$\bar{s}[j] = \frac{1}{K} \sum_{i=-N}^{N}s[j-i]w_i$$
@@ -398,70 +405,154 @@ $$K = \sum_{i=-N}^{N}w_i$$
 
 Notice that the kernel is centered on the sample to be reconstructed, and the
 width of its first lobe is two low-resolution (anti-aliased) pixels. **This
-exactly matches the corresponding reconstruction filter for the target 
+exactly matches the corresponding reconstruction filter for the target
 resolution image.**
 
-### Temporal Anti-aliasing filter
+# Temporal Anti-aliasing
 
-Let's see how this changes in the temporal case.
+Temporal anti-aliasing aims to spread the filter computation over multiple
+frames to reduce the computation demands.
 
-Temporal anti-aliasing spreads the filter computation over multiple 
-frames. Each frame is rendered at the _same_ resolution — or sampling rate — as
+Each frame $i$ is calculating a _partial_ result per pixel $j$, $`\bar{s}_i[j]`$, 
+which gets accumulated to the target pixel, $`h_{i-1}[j]`$, converging to the 
+**average** over time:
+
+$$h_i = (1 - \alpha) \cdot h_{i-1} + \alpha \cdot \bar{s}_i$$
+
+## Temporal anti-aliasing filter
+
+> [!NOTE]
+> We can do all the analysis in one dimension because we've seen earlier 
+> that we can use separable reconstruction filters, which consists of 
+> 1-D filters applied horizontally first and then vertically.
+
+Each frame is rendered at the _same_ resolution — or sampling rate — as
 the target image, but is offset in order to take a different sample. A partial 
-low-pass filter is applied and the result is accumulated to the output image, 
-which over time, converges to _nearly_ the same result as the spatial case:
+low-pass filter is applied and the result is accumulated to the output image,
+as per the equation above.
 
 ![aa_filter_temporal.svg](art/aa_filter_temporal.svg)
 
 Here we get a subset of the samples each frame, specifically one per
-output pixel, but we apply exactly the same filter: it has the same center 
-and size as before. 
+output pixel, but we apply exactly the same filter as in the spacial case: 
+it has the same center and size as before. 
 
-> This is what is often called "unjittering" in many TAA implementations (because 
-the kernel is offset by the jitter-offset to keep it centered on the 
-target pixel-center). "Unjittering" is a bit of a misnomer, as all we're doing
-is keeping the **kernel** centered on the target pixel.
+> [!NOTE]
+> This is what is often called "unjittering" in many TAA implementations 
+> (because the kernel is offset by the jitter-offset to keep it centered on the
+> target pixel-center). "Unjittering" is a bit of a misnomer, as all we're doing
+> is keeping the **kernel** centered on the target pixel.
 
-Each frame is calculating a _partial_ result, $r[i]$, which gets accumulated to the
-target pixel, $h[i-1]$, converging to the **average** over time and producing **nearly**
-the same result as the spatial version:
+As seen previously, each frame is calculating a _partial_ result, $`\bar{s}_i`$,
+which gets accumulated to the target frame, $`h_{i-1}`$ typically as follows:
 
-$$h[i] = (1 - \alpha) \cdot h[i-1] + \alpha \cdot r[i]$$
+$$h_i = (1 - \alpha) \cdot h_{i-1} + \alpha \cdot \bar{s}_i$$
 
-$$h[i] = \alpha \sum_{k=0}^{\infty}(1-\alpha)^k r[i-k]$$
+This operation converges to the average of $\bar{s}_i$ over time:
 
-Because $r[i]$ is periodic (i.e.: $r[i] = r[i-n]$), we can show that:
+$$h_i = \alpha \sum_{k=0}^{\infty}(1-\alpha)^k \bar{s}_{i-k}$$
 
-$$h[i] = \alpha \sum_{k=0}^{\infty}{(1-\alpha)^{k \cdot n}} \sum_{k=0}^{n-1}(1-\alpha)^k r[i-k]$$
+Because $`\bar{s}_i`$ is periodic (i.e.: $`\bar{s}_i = \bar{s}_{i-n}`$), 
+we can show that:
 
-$$h[i] = \frac{\alpha}{1 - (1 - \alpha)^n} \sum_{k=0}^{n-1}(1-\alpha)^k r[i-k]$$
+$$h_i = \alpha \sum_{k=0}^{\infty}{(1-\alpha)^{k \cdot n}} \sum_{k=0}^{n-1}(1-\alpha)^k \bar{s}_{i-k}$$
+
+$$h_i = \frac{\alpha}{1 - (1 - \alpha)^n} \sum_{k=0}^{n-1}(1-\alpha)^k \bar{s}_{i-k}$$
 
 And finally, when $\alpha \rightarrow 0$, this expression becomes:
 
-$$h[i] = \frac{1}{n} \sum_{k=0}^{n-1}r[i-k]$$
+$$\boxed{ h_i = \frac{1}{n} \sum_{k=0}^{n-1}\bar{s}_k }$$
 
-which is the **average** of $r[i]$.
+which is the **average** of $\bar{s}_i$.
 
-So in the end, the partial filter results are essentially averaged, converging
-to nearly the same result as the spatial-only anti-aliasing computation.
+> [!NOTE]
+> At the $\alpha \rightarrow 0$ limit, $h_i$ doesn't depend on $i$.
 
-#### Caveats
+So in the end, the partial filter results are essentially _averaged_, provided 
+that $\alpha$ is small.
 
-##### Normalization weights
+### Averaging & Normalization weights
 
-There is a _slight_ difference however because the convolution normalization 
-factor is applied on the partial result at each frame, and the weight-sum
-is not equal to the average of the partial weight-sums:
+The averaging over $n$ frames of the partial filter outputs produces an 
+incorrect result because the convolution normalization factor is applied to 
+the partial result at each frame, i.e.:
 
-$$\sum_{i}^{N}{w_i} \ne Avg(\sum_{j}^{M}{w_j})$$
+$$\bar{s}[j] \ne \frac{1}{n} \left( \bar{s}_ 0[j] + \cdots + \bar{s}_ {n-1}[j] \right)$$
 
-However, if $\sum w_j$ are all similar, the above becomes an
-equality, and in practice it is often close to 1. We can also compensate
-for this by modulating the accumulation factor by the partial weight sum 
-$\sum w_j$. This makes intuitive sense; when the weight sum is lower, these 
-samples contributed less to the final filter result.
+It is however possible to fix this problem by multiplying the accumulation 
+factor $\alpha$ by $K_i$, the sum of the weights of each partial filter 
+(with $r_i$ the unnormalized partial filter output):
 
-##### Filter Kernel with negative lobes
+$$h_i = (1 - \alpha \cdot K_i) \cdot h_{i-1} + \alpha \cdot r_i$$
+
+>[!NOTE]
+> As a nice side effect, this also removes the possible divide-by-0 when 
+> $K_i$ is null.
+
+The steady-state sequence $`\bar{h}_i`$ must satisfy the defining equation:
+
+$$\bar{h}_ i = (1-\alpha \cdot K_ i) \cdot \bar{h}_ {i-1} + \alpha \cdot \bar{r}_ i$$
+
+and because it's periodic of period $n$, we know that 
+$`\bar{h}_i = \bar{h}_{i+n}`$. We can sum both sides of the steady-state equation 
+over one period:
+
+$$\sum_{i=1}^{n}\bar{h}_ i = \sum_{i=1}^{n}(1-\alpha \cdot K_ i) \cdot \bar{h}_ {i-1} + \sum_{i=1}^{n}\alpha \cdot \bar{r}_ i$$
+
+$$\sum_{i=1}^{N}\bar{h}_ i = \sum_{i=1}^{n} (\bar{h}_ {i-1} - \alpha \cdot K_i \cdot \bar{h}_ {i-1}) + \sum_{i=1}^{n}\alpha \cdot \bar{r}_ i$$
+
+$$
+\begin{equation}
+\label{eq:1}
+\sum_{i=1}^{N}\bar{h}_ i = \sum_{i=1}^{n} \bar{h}_ {i-1} - \sum_{i=1}^{n} \alpha \cdot K_ i \cdot \bar{h}_ {i-1} + \sum_{i=1}^{n}\alpha \cdot \bar{r}_ i
+\end{equation}
+$$
+
+Now, let's compare $`\sum_{i=1}^{N}\bar{h}_i`$ and $`\sum_{i=1}^{N}\bar{h}_{i-1}`$ 
+
+$$\sum_{i=1}^{n}\bar{h}_ i     = \bar{h}_ 1 + \bar{h}_ 2 + \cdots + \bar{h}_ {n-1} + \bar{h}_ n$$
+$$\sum_{i=1}^{n}\bar{h}_ {i-1} = \bar{h}_ 0 + \bar{h}_ 1 + \cdots + \bar{h}_ {n-2} + \bar{h}_ {n-1}$$
+
+Because $`\bar{h}_0 = \bar{h}_n`$ both expressions are identical. Therefore:
+
+$$\sum_{i=1}^{N}\bar{h}_ i = \sum_{i=1}^{N}\bar{h}_ {i-1}$$
+
+We can now substitute this equality in equation $`\eqref{eq:1}`$
+
+$$\sum_{i=1}^{N}\bar{h}_ {i-1} = \sum_{i=1}^{n} \bar{h}_ {i-1} - \sum_{i=1}^{n} \alpha \cdot K_ i \cdot \bar{h}_ {i-1} + \sum_{i=1}^{n}\alpha \cdot \bar{r}_ i$$
+
+Rearrange and divide by $\alpha$:
+
+$$\sum_{i=1}^n K_ i \cdot \bar{h}_ {i-1} = \sum_{i=1}^{n} \bar{r}_ i$$
+
+Now, take the limit as $`\alpha \rightarrow 0`$. In this limit, the steady state 
+$`\bar{h}_i`$ approaches a constant for all $i$. So, $`\bar{h}_{i-1}`$ also 
+approaches this constant. Substituting this into the summed equation:
+
+$$lim_{\alpha \to 0} \sum_{i=1}^{n} K_ i \cdot \bar{h}_ {i-1} = lim_{\alpha \to 0} \sum_{i=1}^{n} \bar{r}_ i$$
+
+because neither $`K_i`$ nor $`r_i`$ depend on $`\alpha`$:
+
+$$\sum_{i=1}^{n} K_ i \cdot lim_{\alpha \to 0} \bar{h}_ {i-1} =  \sum_{i=1}^{n} \bar{r}_ i$$
+
+And since $`lim_{\alpha \to 0} \bar{h}_{i-1}`$ is a constant by definition 
+(it's the value the series is converging to), let's call it $`\bar{h}_{limit}`$:
+
+$$\bar{h}_ {limit} \sum_{i=1}^{n} K_ i = \sum_{i=1}^{n} \bar{r}_ i$$
+
+And finally:
+
+$$\boxed{ \bar{h}_ {limit} = \frac{1}{\sum_{i=1}^{n}K_ i} \cdot \sum_{i=1}^{n}\bar{r}_ i }$$
+
+As demonstrated here, multiplying $\alpha$ by the partial summed weights makes
+the history accumulation operation converge to the weighted average instead
+of the average, which completely solves our problem with the partial 
+normalization factors, the addition being associative, the final result now 
+converges **exactly** to the same result as in the spatial-only case.
+
+### Caveat
+
+#### Filter Kernel with negative lobes
 
 In practice when using filters that have negative lobes, like the Lanczos 
 filter, we need to ensure that the resulting sample is not negative. This is 
@@ -475,7 +566,7 @@ The deringing operation is not linear and not commutative. In practice we
 often ignore this problem. A solution is to use a filter without negative
 lobes, but they generally produce a blurrier image.
 
-### Temporal Upscaling & Anti-aliasing filter
+## Temporal Upscaling & Anti-aliasing filter
 
 Something to realize is that temporal upscaling like FSR-2 and others, is not
 actually **upscaling**, as in "resampling", or as in "video upscaling", it is in 
@@ -491,28 +582,68 @@ it is still sized like a reconstruction filter at the **output** resolution:
 
 ![sr_filter_temporal.svg](art/sr_filter_temporal.svg)
 
+> [!NOTE]
 > Many upscaling TAA implementations use a filter sized for the **input**
 > resolution — which in my opinion is incorrect — to compensate for this, they 
 > modulate the history accumulation factor (often called $alpha$) based on the
 > distance of the sample to the reconstructed pixel center. Doing so overly
 > blurs the input.
 
-#### Caveats
+### Caveats
 
-##### Normalization weights
+#### Normalization weights
 
 Because the partial filter is now computed with less samples, while keeping 
 the same support, we can end-up with a partial result where the normalization
 factor is much smaller than 1. This is a **key** difference compared to TAA. 
-We can no longer assume that averaging the partial results is correct. 
 It becomes essential to modulate the $\alpha$ parameter by the partial weight.
 
+> [!NOTE]
 > Each partial filter computation can be thought of computing a low-pass filter
-> with a cutoff frequency _above_ the Nyquist frequency.
+> with a cutoff frequency _above_ the Nyquist frequency. While this seems 
+> counter intuitive, the weighted exponential accumulation will converge to
+> the proper low-pass filter at the target resolution.
 
-##### Deringing
+#### Deringing
 
 Just like with the TAA case, deringing is a problem, and it is in fact more of
 a problem with upscaling, as intermediate frames are more prone to 
 outputting a negative sample, because some of them lack a a sample with a
 strong positive weight.
+
+# Conclusions
+
+## 2D lanczos applications
+There are two correct 2D applications of the Lanczos filter $L_a$. The separable
+application:
+
+$$L_a(x, y) = L_a(x) \cdot L_a(y)$$
+
+And the radial basis function application, which uses a modified Lanczos filter:
+
+```math
+L_a(\rho) = \left\{ \begin{array}{cl} \pi jinc(\rho)jinc(\rho/a) & if \ |\rho| \lt a \\ 0 & otherwise \end{array} \right.
+```
+with $jinc(\rho)=J_1(\pi \rho) / \pi \rho$ and $\rho = \sqrt{x^2 + y^2}$
+
+$L_a(x, y)$ is separable but anisotropic, while $L_a(\rho)$ is isotropic but 
+non-separable.
+
+In particular, defining $L_a(x, y)$ as $L_a(\sqrt{x^2 + y^2})$ is **incorrect**.
+
+## TAA history accumulation feedback parameter
+
+The history accumulation feedback parameter $\alpha$ must be multiplied by the
+the sum of the partial filter weights:
+
+$$h_ i = (1 - K_ i \cdot \alpha) \cdot h_ {i-1} + r_ i$$
+
+This allows the exponential smoothing to converge towards the same result as
+the spatial anti-aliasing filter at the limit $lim_{\alpha \to 0}$. 
+
+## TAA upscaling filter support
+
+Temporal upscaling is just temporal anti-aliasing with less than
+one sample per frame, per output pixel. However, the filter stays exactly the 
+same; its support, in particular, must remain relative to the **output** 
+resolution. 
