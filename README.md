@@ -89,6 +89,16 @@ L_a(x) = \left\{ \begin{array}{cl} sinc(x)sinc(x/a) & if \ |x| \lt a \\ 0 & othe
 
 ![lanczos-2 and Lanczos-3](art/lanczos.svg)
 
+Lanczos can be used effectively for resampling a digital signal or as a 
+low-pass filter.
+
+The $a$ parameter defines the filter support or width. The larger
+the support the better the filter performs (i.e.: approximates the ideal
+reconstruction filter), but the more computationally intensive it becomes. 
+Lanczos-2, or $L_2(x)$, has a width of 4 and requires four samples when used
+to resample a signal. Similarly, Lanczos-3, or $L_3(x)$, has a width of 6 and
+requires six samples.
+
 Lanczos as defined above is a 1D filter, but obviously here we need a 2D 
 application of it. That's where things start to become weird. There is 
 something peculiar in the various usages of Lanczos as a 2D filter: sometimes it
