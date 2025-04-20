@@ -50,6 +50,16 @@ classdef Kernels
             y =  w * exp(-n * (x.^2));
         end
 
+        function y = lanczos2Approx(r)
+            x2 = r.^2;
+            wA = x2 - 4.0;
+            wB = x2 .* wA - wA;
+            wA = wA.^2;
+            wB = wB .* wA;
+            y = wB / 64;
+            y(abs(r)>2) = 0;
+        end
+
         function y = blackmanharris(N, x)
             x = x - N / 2;
             a0 = 0.35875;
