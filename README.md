@@ -513,8 +513,7 @@ $$\sum_{i=1}^{N}\bar{h}_ i = \sum_{i=1}^{n} (\bar{h}_ {i-1} - \alpha \cdot K_i \
 
 $$
 \begin{equation}
-\label{eq:1}
-\sum_{i=1}^{N}\bar{h}_ i = \sum_{i=1}^{n} \bar{h}_ {i-1} - \sum_{i=1}^{n} \alpha \cdot K_ i \cdot \bar{h}_ {i-1} + \sum_{i=1}^{n}\alpha \cdot \bar{r}_ i
+\sum_{i=1}^{N}\bar{h}_ i = \sum_{i=1}^{n} \bar{h}_ {i-1} - \sum_{i=1}^{n} \alpha \cdot K_ i \cdot \bar{h}_ {i-1} + \sum_{i=1}^{n}\alpha \cdot \bar{r}_ i \ \ \ \ \ \text(1)
 \end{equation}
 $$
 
@@ -527,7 +526,7 @@ Because $`\bar{h}_0 = \bar{h}_n`$ both expressions are identical. Therefore:
 
 $$\sum_{i=1}^{N}\bar{h}_ i = \sum_{i=1}^{N}\bar{h}_ {i-1}$$
 
-We can now substitute this equality in equation $`\eqref{eq:1}`$
+We can now substitute this equality in equation $`(1)`$
 
 $$\sum_{i=1}^{N}\bar{h}_ {i-1} = \sum_{i=1}^{n} \bar{h}_ {i-1} - \sum_{i=1}^{n} \alpha \cdot K_ i \cdot \bar{h}_ {i-1} + \sum_{i=1}^{n}\alpha \cdot \bar{r}_ i$$
 
